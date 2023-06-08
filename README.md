@@ -1,2 +1,7 @@
-# upkie_sandbox
-Experimental Upkie agents (not maintained)
+# Upkie sandbox
+
+Experimental Upkie agents (not maintained). Run any agent directly with Bazelisk, for example:
+
+```console
+$ ./tools/bazelisk run //sshkeyboard_balancer -- -c bullet
+```
