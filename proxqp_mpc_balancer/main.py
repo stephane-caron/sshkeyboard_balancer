@@ -6,9 +6,11 @@
 """Wheel balancing using model predictive control of an LTV system."""
 
 import asyncio
+import os
 import time
 from time import perf_counter
 
+import gin
 import gymnasium as gym
 import mpacklog
 import numpy as np
@@ -21,19 +23,23 @@ from upkie.utils.filters import low_pass_filter
 from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.spdlog import logging
 
-from ltv_mpc import MPCQP, Plan
+from ltv_mpc import MPCQP, Plan, solve_mpc
 from ltv_mpc.systems import CartPole
 
 upkie.envs.register()
 
-NB_STEPS = 10_000
+NB_STEPS = 10
 LIVE_PLOT: bool = False
-USE_PRECONDITIONER: bool = True
+USE_PRECONDITIONER: bool = False
+REBUILD_QP_EVERY_TIME: bool = False
 WARM_START: bool = True
 
 
+@gin.configurable
 class ProxQPWorkspace:
-    def __init__(self, mpc_qp: MPCQP, verbose: bool = False):
+    def __init__(
+        self, mpc_qp: MPCQP, update_preconditioner: bool, verbose: bool
+    ):
         n_eq = 0
         n_in = mpc_qp.h.size // 2  # CartPole structure
         n = mpc_qp.P.shape[1]
@@ -56,12 +62,13 @@ class ProxQPWorkspace:
             u=mpc_qp.h[::2],  # CartPole structure
         )
         solver.solve()
+        self.update_preconditioner = update_preconditioner
         self.solver = solver
 
     def solve(self, mpc_qp: MPCQP) -> qpsolvers.Solution:
         self.solver.update(
             g=mpc_qp.q,
-            update_preconditioner=USE_PRECONDITIONER,  # TODO(scaron): test
+            update_preconditioner=self.update_preconditioner,
         )
         self.solver.solve()
         qpsol = qpsolvers.Solution(mpc_qp.problem)
@@ -122,7 +129,7 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     env.reset()  # connects to the spine
     action = np.zeros(env.action_space.shape)
     commanded_velocity = 0.0
-    qp_solve_times = np.empty((NB_STEPS,))
+    planning_times = np.empty((NB_STEPS,))
     for step in range(NB_STEPS):
         action[0] = commanded_velocity
         observation, _, terminated, truncated, info = await env.async_step(
@@ -158,13 +165,16 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
         mpc_qp.update_cost_vector(mpc_problem)
 
         t0 = perf_counter()
-        if WARM_START:
-            qpsol = proxqp.solve(mpc_qp)
+        if REBUILD_QP_EVERY_TIME:
+            plan = solve_mpc(mpc_problem, solver="proxqp")
         else:
-            qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
-        qp_solve_times[step] = perf_counter() - t0
+            if WARM_START:
+                qpsol = proxqp.solve(mpc_qp)
+            else:
+                qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
+            plan = Plan(mpc_problem, qpsol)
+        planning_times[step] = perf_counter() - t0
 
-        plan = Plan(mpc_problem, qpsol)
         if not ground_contact:
             logging.info("Waiting for ground contact")
             commanded_velocity = low_pass_filter(
@@ -196,21 +206,23 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
             }
         )
     await logger.stop()
-    report(qp_solve_times)
+    report(planning_times)
 
 
-def report(qp_solve_times: np.ndarray):
-    nb_steps = qp_solve_times.size
+def report(planning_times: np.ndarray):
+    average_ms = 1e3 * np.average(planning_times)
+    std_ms = 1e3 * np.std(planning_times)
+    nb_steps = planning_times.size
     print("")
     print("===================================")
     print(f"{LIVE_PLOT=}")
     print(f"{NB_STEPS=}")
-    print(f"{USE_PRECONDITIONER=}")
+    print(f"{REBUILD_QP_EVERY_TIME=}")
     print(f"{WARM_START=}")
+    print(f"{gin.operative_config_str()}")
     print("")
-    print(f"Over {nb_steps} calls:")
-    print(f"{np.average(qp_solve_times)=}")
-    print(f"{np.std(qp_solve_times)=}")
+    print(f"Over {nb_steps} calls: {average_ms:.2} ± {std_ms:.2} ms")
+    print("")
 
 
 async def main():
@@ -226,4 +238,6 @@ async def main():
 if __name__ == "__main__":
     if on_raspi():
         configure_agent_process()
+    agent_dir = os.path.dirname(__file__)
+    gin.parse_config_file(f"{agent_dir}/config.gin")
     asyncio.run(main())
