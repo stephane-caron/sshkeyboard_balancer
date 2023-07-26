@@ -7,6 +7,7 @@
 
 import asyncio
 import time
+from time import perf_counter
 
 import gymnasium as gym
 import mpacklog
@@ -25,43 +26,48 @@ from ltv_mpc.systems import CartPole
 
 upkie.envs.register()
 
-
-def prepare_proxqp(mpc_qp: MPCQP, verbose: bool = False):
-    n_eq = 0
-    n_in = mpc_qp.h.size // 2  # CartPole structure
-    n = mpc_qp.P.shape[1]
-    proxqp = proxsuite.proxqp.dense.QP(
-        n,
-        n_eq,
-        n_in,
-        dense_backend=proxsuite.proxqp.dense.DenseBackend.PrimalDualLDLT,
-    )
-    proxqp.settings.eps_abs = 1e-3
-    proxqp.settings.eps_rel = 0.0
-    proxqp.settings.verbose = verbose
-    proxqp.settings.compute_timings = True
-    proxqp.settings.primal_infeasibility_solving = True
-    proxqp.init(
-        H=mpc_qp.P,
-        g=mpc_qp.q,
-        C=mpc_qp.G[::2, :],  # CartPole structure
-        l=-mpc_qp.h[1::2],  # CartPole structure
-        u=mpc_qp.h[::2],  # CartPole structure
-    )
-    proxqp.solve()
-    return proxqp
+NB_STEPS = 10_000
+LIVE_PLOT: bool = False
+USE_PRECONDITIONER: bool = True
+WARM_START: bool = True
 
 
-def update_proxqp(proxqp, mpc_qp: MPCQP):
-    proxqp.update(
-        g=mpc_qp.q,
-        update_preconditioner=True,  # TODO(scaron): test
-    )
-    proxqp.solve()
-    qpsol = qpsolvers.Solution(mpc_qp.problem)
-    qpsol.found = True
-    qpsol.x = proxqp.results.x
-    return qpsol
+class ProxQPWorkspace:
+    def __init__(self, mpc_qp: MPCQP, verbose: bool = False):
+        n_eq = 0
+        n_in = mpc_qp.h.size // 2  # CartPole structure
+        n = mpc_qp.P.shape[1]
+        solver = proxsuite.proxqp.dense.QP(
+            n,
+            n_eq,
+            n_in,
+            dense_backend=proxsuite.proxqp.dense.DenseBackend.PrimalDualLDLT,
+        )
+        solver.settings.eps_abs = 1e-3
+        solver.settings.eps_rel = 0.0
+        solver.settings.verbose = verbose
+        solver.settings.compute_timings = True
+        solver.settings.primal_infeasibility_solving = True
+        solver.init(
+            H=mpc_qp.P,
+            g=mpc_qp.q,
+            C=mpc_qp.G[::2, :],  # CartPole structure
+            l=-mpc_qp.h[1::2],  # CartPole structure
+            u=mpc_qp.h[::2],  # CartPole structure
+        )
+        solver.solve()
+        self.solver = solver
+
+    def solve(self, mpc_qp: MPCQP) -> qpsolvers.Solution:
+        self.solver.update(
+            g=mpc_qp.q,
+            update_preconditioner=USE_PRECONDITIONER,  # TODO(scaron): test
+        )
+        self.solver.solve()
+        qpsol = qpsolvers.Solution(mpc_qp.problem)
+        qpsol.found = True
+        qpsol.x = self.solver.results.x
+        return qpsol
 
 
 def get_target_states(
@@ -105,10 +111,10 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     )
     mpc_problem.initial_state = np.zeros(4)
     mpc_qp = MPCQP(mpc_problem)
-    proxqp = prepare_proxqp(mpc_qp)
+    proxqp = ProxQPWorkspace(mpc_qp)
 
     live_plot = None
-    if not on_raspi():
+    if LIVE_PLOT and not on_raspi():
         from ltv_mpc.live_plots import CartPolePlot  # imports matplotlib
 
         live_plot = CartPolePlot(cart_pole, order="velocities")
@@ -116,7 +122,8 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     env.reset()  # connects to the spine
     action = np.zeros(env.action_space.shape)
     commanded_velocity = 0.0
-    while True:
+    qp_solve_times = np.empty((NB_STEPS,))
+    for step in range(NB_STEPS):
         action[0] = commanded_velocity
         observation, _, terminated, truncated, info = await env.async_step(
             action
@@ -149,9 +156,14 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
         mpc_problem.update_goal_state(target_states[-CartPole.STATE_DIM :])
         mpc_problem.update_target_states(target_states[: -CartPole.STATE_DIM])
         mpc_qp.update_cost_vector(mpc_problem)
-        update_proxqp(proxqp, mpc_qp)
 
-        qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
+        t0 = perf_counter()
+        if WARM_START:
+            qpsol = proxqp.solve(mpc_qp)
+        else:
+            qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
+        qp_solve_times[step] = perf_counter() - t0
+
         plan = Plan(mpc_problem, qpsol)
         if not ground_contact:
             logging.info("Waiting for ground contact")
@@ -184,6 +196,21 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
             }
         )
     await logger.stop()
+    report(qp_solve_times)
+
+
+def report(qp_solve_times: np.ndarray):
+    nb_steps = qp_solve_times.size
+    print("")
+    print("===================================")
+    print(f"{LIVE_PLOT=}")
+    print(f"{NB_STEPS=}")
+    print(f"{USE_PRECONDITIONER=}")
+    print(f"{WARM_START=}")
+    print("")
+    print(f"Over {nb_steps} calls:")
+    print(f"{np.average(qp_solve_times)=}")
+    print(f"{np.std(qp_solve_times)=}")
 
 
 async def main():
