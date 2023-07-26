@@ -36,7 +36,7 @@ py_binary(
     deps = [
         ":servo_controller",
         "@mpacklog//:python",
-        "@upkie//utils:realtime",
+        "@upkie//utils:raspi",
         "@upkie//utils:spdlog",
         "@vulp//spine:python",
         requirement("loop_rate_limiters"),

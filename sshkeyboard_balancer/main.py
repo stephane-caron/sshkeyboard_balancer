@@ -31,7 +31,7 @@ import mpacklog
 import yaml
 from loop_rate_limiters import AsyncRateLimiter
 from sshkeyboard import listen_keyboard_manual
-from utils.realtime import configure_cpu
+from upkie.utils.raspi import configure_agent_process, on_raspi
 from utils.spdlog import logging
 from vulp.spine import SpineInterface
 
@@ -133,6 +133,8 @@ async def main(spine, config: Dict[str, Any]):
 
 
 if __name__ == "__main__":
+    if on_raspi():
+        configure_agent_process()
     args = parse_command_line_arguments()
     agent_dir = path.dirname(__file__)
 
@@ -144,8 +146,6 @@ if __name__ == "__main__":
     # Spine configuration
     with open(f"{agent_dir}/config/spine.yaml", "r") as fh:
         config = yaml.safe_load(fh)
-    if args.configure_cpu:
-        configure_cpu(cpu=3)
 
     spine = SpineInterface()
     try:
