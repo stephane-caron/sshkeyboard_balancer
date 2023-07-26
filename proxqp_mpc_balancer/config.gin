@@ -1,0 +1,6 @@
+ProxQPWorkspace.update_preconditioner = True
+ProxQPWorkspace.verbose = False
+balance.nb_steps = 10_000
+balance.rebuild_qp_every_time = False
+balance.show_live_plot = False
+balance.warm_start = True
