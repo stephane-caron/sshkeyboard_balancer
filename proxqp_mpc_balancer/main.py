@@ -164,12 +164,12 @@ async def balance(
         mpc_problem.update_initial_state(initial_state)
         mpc_problem.update_goal_state(target_states[-CartPole.STATE_DIM :])
         mpc_problem.update_target_states(target_states[: -CartPole.STATE_DIM])
-        mpc_qp.update_cost_vector(mpc_problem)
 
         t0 = perf_counter()
         if rebuild_qp_every_time:
             plan = solve_mpc(mpc_problem, solver="proxqp")
         else:
+            mpc_qp.update_cost_vector(mpc_problem)
             if warm_start:
                 qpsol = proxqp.solve(mpc_qp)
             else:
