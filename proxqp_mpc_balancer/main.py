@@ -12,12 +12,14 @@ import gymnasium as gym
 import mpacklog
 import numpy as np
 import upkie.envs
-from ltv_mpc import solve_mpc
-from ltv_mpc.systems import CartPole
+from qpsolvers import solve_problem
 from upkie.utils.clamp import clamp_and_warn
 from upkie.utils.filters import low_pass_filter
 from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.spdlog import logging
+
+from ltv_mpc import MPCQP, Plan
+from ltv_mpc.systems import CartPole
 
 upkie.envs.register()
 
@@ -53,14 +55,16 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     cart_pole = CartPole(
         length=0.4,
         max_ground_accel=10.0,
-        nb_timesteps=12,
-        sampling_period=env.dt,
+        nb_timesteps=102,
+        sampling_period=0.005,
     )
     mpc_problem = cart_pole.build_mpc_problem(
         terminal_cost_weight=10.0,
         stage_state_cost_weight=1.0,
         stage_input_cost_weight=1e-3,
     )
+    mpc_problem.initial_state = np.zeros(4)
+    mpc_qp = MPCQP(mpc_problem)
 
     live_plot = None
     if not on_raspi():
@@ -103,8 +107,10 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
         mpc_problem.update_initial_state(initial_state)
         mpc_problem.update_goal_state(target_states[-CartPole.STATE_DIM :])
         mpc_problem.update_target_states(target_states[: -CartPole.STATE_DIM])
+        mpc_qp.update_cost_vector(mpc_problem)
 
-        plan = solve_mpc(mpc_problem, solver="proxqp")
+        qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
+        plan = Plan(mpc_problem, qpsol)
         if not ground_contact:
             logging.info("Waiting for ground contact")
             commanded_velocity = low_pass_filter(
