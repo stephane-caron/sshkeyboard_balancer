@@ -20,42 +20,45 @@ from upkie.utils.filters import low_pass_filter
 from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.spdlog import logging
 
-from ltv_mpc import MPCQP, MPCProblem, Plan
+from ltv_mpc import MPCQP, Plan
 from ltv_mpc.systems import CartPole
 
 upkie.envs.register()
 
 
-def prepare_proxqp(mpc_problem: MPCProblem):
+def prepare_proxqp(mpc_qp: MPCQP, verbose: bool = False):
     n_eq = 0
-    n_in = mpc_problem.h.size()
-    n = mpc_problem.P.shape[1]
-    solver = proxsuite.proxqp.dense.QP(
+    n_in = mpc_qp.h.size // 2  # CartPole structure
+    n = mpc_qp.P.shape[1]
+    proxqp = proxsuite.proxqp.dense.QP(
         n,
         n_eq,
         n_in,
         dense_backend=proxsuite.proxqp.dense.DenseBackend.PrimalDualLDLT,
     )
-    solver.settings.eps_abs = 1e-3
-    solver.settings.eps_rel = 0.0
-    solver.settings.verbose = True
-    solver.settings.compute_timings = True
-    solver.settings.primal_infeasibility_solving = True
-    solver.init(
-        H=mpc_problem.P,
-        g=mpc_problem.q,
-        C=mpc_problem.G[::2, :],  # particular structure of CartPole
-        l=-mpc_problem.h[1::2],  # idem
-        u=mpc_problem.h[::2],  # idem
+    proxqp.settings.eps_abs = 1e-3
+    proxqp.settings.eps_rel = 0.0
+    proxqp.settings.verbose = verbose
+    proxqp.settings.compute_timings = True
+    proxqp.settings.primal_infeasibility_solving = True
+    proxqp.init(
+        H=mpc_qp.P,
+        g=mpc_qp.q,
+        C=mpc_qp.G[::2, :],  # CartPole structure
+        l=-mpc_qp.h[1::2],  # CartPole structure
+        u=mpc_qp.h[::2],  # CartPole structure
     )
-    solver.solve()
+    proxqp.solve()
+    return proxqp
 
 
-def proxqp_update(proxqp, mpc_problem: MPCProblem):
-    proxqp.update(g=mpc_problem.q,
-                  update_preconditioner=True,  # TODO(scaron): test
-                  )
-    qpsol = qpsolvers.Solution()
+def update_proxqp(proxqp, mpc_qp: MPCQP):
+    proxqp.update(
+        g=mpc_qp.q,
+        update_preconditioner=True,  # TODO(scaron): test
+    )
+    proxqp.solve()
+    qpsol = qpsolvers.Solution(mpc_qp.problem)
     qpsol.found = True
     qpsol.x = proxqp.results.x
     return qpsol
@@ -102,6 +105,7 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     )
     mpc_problem.initial_state = np.zeros(4)
     mpc_qp = MPCQP(mpc_problem)
+    proxqp = prepare_proxqp(mpc_qp)
 
     live_plot = None
     if not on_raspi():
@@ -145,6 +149,7 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
         mpc_problem.update_goal_state(target_states[-CartPole.STATE_DIM :])
         mpc_problem.update_target_states(target_states[: -CartPole.STATE_DIM])
         mpc_qp.update_cost_vector(mpc_problem)
+        update_proxqp(proxqp, mpc_qp)
 
         qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
         plan = Plan(mpc_problem, qpsol)
