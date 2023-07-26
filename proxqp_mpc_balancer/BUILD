@@ -21,8 +21,8 @@ py_binary(
     data = [
         ":config",
     ] + select({
-        "//:pi32_config": ["//spines:pi3hat"],
-        "//:pi64_config": ["//spines:pi3hat"],
+        "//:pi32_config": ["@upkie//spines:pi3hat"],
+        "//:pi64_config": ["@upkie//spines:pi3hat"],
         "//conditions:default": [],
     }),
     deps = [
