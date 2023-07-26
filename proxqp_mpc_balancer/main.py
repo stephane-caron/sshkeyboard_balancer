@@ -28,12 +28,6 @@ from ltv_mpc.systems import CartPole
 
 upkie.envs.register()
 
-NB_STEPS = 10
-LIVE_PLOT: bool = False
-USE_PRECONDITIONER: bool = False
-REBUILD_QP_EVERY_TIME: bool = False
-WARM_START: bool = True
-
 
 @gin.configurable
 class ProxQPWorkspace:
@@ -98,7 +92,15 @@ def get_target_states(
     return target_states
 
 
-async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
+@gin.configurable
+async def balance(
+    env: gym.Env,
+    logger: mpacklog.AsyncLogger,
+    nb_steps: int,
+    rebuild_qp_every_time: bool,
+    show_live_plot: bool,
+    warm_start: bool,
+):
     """!
     Run proportional balancer in gym environment with logging.
 
@@ -121,7 +123,7 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     proxqp = ProxQPWorkspace(mpc_qp)
 
     live_plot = None
-    if LIVE_PLOT and not on_raspi():
+    if show_live_plot and not on_raspi():
         from ltv_mpc.live_plots import CartPolePlot  # imports matplotlib
 
         live_plot = CartPolePlot(cart_pole, order="velocities")
@@ -129,8 +131,8 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
     env.reset()  # connects to the spine
     action = np.zeros(env.action_space.shape)
     commanded_velocity = 0.0
-    planning_times = np.empty((NB_STEPS,))
-    for step in range(NB_STEPS):
+    planning_times = np.empty((nb_steps,))
+    for step in range(nb_steps):
         action[0] = commanded_velocity
         observation, _, terminated, truncated, info = await env.async_step(
             action
@@ -165,10 +167,10 @@ async def balance(env: gym.Env, logger: mpacklog.AsyncLogger):
         mpc_qp.update_cost_vector(mpc_problem)
 
         t0 = perf_counter()
-        if REBUILD_QP_EVERY_TIME:
+        if rebuild_qp_every_time:
             plan = solve_mpc(mpc_problem, solver="proxqp")
         else:
-            if WARM_START:
+            if warm_start:
                 qpsol = proxqp.solve(mpc_qp)
             else:
                 qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
@@ -214,11 +216,6 @@ def report(planning_times: np.ndarray):
     std_ms = 1e3 * np.std(planning_times)
     nb_steps = planning_times.size
     print("")
-    print("===================================")
-    print(f"{LIVE_PLOT=}")
-    print(f"{NB_STEPS=}")
-    print(f"{REBUILD_QP_EVERY_TIME=}")
-    print(f"{WARM_START=}")
     print(f"{gin.operative_config_str()}")
     print("")
     print(f"Over {nb_steps} calls: {average_ms:.2} ± {std_ms:.2} ms")
