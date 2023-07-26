@@ -11,6 +11,8 @@ import time
 import gymnasium as gym
 import mpacklog
 import numpy as np
+import proxsuite
+import qpsolvers
 import upkie.envs
 from qpsolvers import solve_problem
 from upkie.utils.clamp import clamp_and_warn
@@ -18,10 +20,45 @@ from upkie.utils.filters import low_pass_filter
 from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.spdlog import logging
 
-from ltv_mpc import MPCQP, Plan
+from ltv_mpc import MPCQP, MPCProblem, Plan
 from ltv_mpc.systems import CartPole
 
 upkie.envs.register()
+
+
+def prepare_proxqp(mpc_problem: MPCProblem):
+    n_eq = 0
+    n_in = mpc_problem.h.size()
+    n = mpc_problem.P.shape[1]
+    solver = proxsuite.proxqp.dense.QP(
+        n,
+        n_eq,
+        n_in,
+        dense_backend=proxsuite.proxqp.dense.DenseBackend.PrimalDualLDLT,
+    )
+    solver.settings.eps_abs = 1e-3
+    solver.settings.eps_rel = 0.0
+    solver.settings.verbose = True
+    solver.settings.compute_timings = True
+    solver.settings.primal_infeasibility_solving = True
+    solver.init(
+        H=mpc_problem.P,
+        g=mpc_problem.q,
+        C=mpc_problem.G[::2, :],  # particular structure of CartPole
+        l=-mpc_problem.h[1::2],  # idem
+        u=mpc_problem.h[::2],  # idem
+    )
+    solver.solve()
+
+
+def proxqp_update(proxqp, mpc_problem: MPCProblem):
+    proxqp.update(g=mpc_problem.q,
+                  update_preconditioner=True,  # TODO(scaron): test
+                  )
+    qpsol = qpsolvers.Solution()
+    qpsol.found = True
+    qpsol.x = proxqp.results.x
+    return qpsol
 
 
 def get_target_states(
