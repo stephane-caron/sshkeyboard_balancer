@@ -35,6 +35,10 @@ RASPUNZEL = $(CURDIR)/tools/raspunzel
 clean_broken_links:
 	find -L $(CURDIR) -type l ! -exec test -e {} \; -delete
 
+.PHONY: clean
+clean: clean_broken_links
+	$(BAZEL) clean --expunge
+
 .PHONY: check-robot
 check-robot:
 	@ if [ -z "${ROBOT}" ]; then \
