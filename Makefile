@@ -67,8 +67,16 @@ run_mock_spine:  ### run the mock spine on the Raspberry Pi
 run_pi3hat_spine:  ### run the pi3hat spine on the Raspberry Pi
 	$(RASPUNZEL) run -s @upkie//spines:pi3hat
 
+restore_runfiles:
+	rm -rf bazel-bin/proxqp_mpc_balancer/proxqp_mpc_balancer.runfiles/pip_upkie_numpy
+	rm -rf bazel-bin/proxqp_mpc_balancer/proxqp_mpc_balancer.runfiles/pip_upkie_scipy
+	sudo mv /tmp/pip_upkie_* bazel-bin/proxqp_mpc_balancer/proxqp_mpc_balancer.runfiles/
+
 run_proxqp_mpc_balancer:  ### sandbox agent
+	sudo mv bazel-bin/proxqp_mpc_balancer/proxqp_mpc_balancer.runfiles/pip_upkie_numpy /tmp
+	sudo mv bazel-bin/proxqp_mpc_balancer/proxqp_mpc_balancer.runfiles/pip_upkie_scipy /tmp
 	$(RASPUNZEL) run -v -s //proxqp_mpc_balancer -- --config pi3hat --configure-cpu
+	sudo mv /tmp/pip_upkie_* bazel-bin/proxqp_mpc_balancer/proxqp_mpc_balancer.runfiles/
 
 run_sshkeyboard_balancer:  ### sandbox agent
 	$(RASPUNZEL) run -v -s //sshkeyboard_balancer -- --config pi3hat --configure-cpu
