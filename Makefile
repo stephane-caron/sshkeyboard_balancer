@@ -52,13 +52,21 @@ check-robot:
 
 .PHONY: build
 build: clean_broken_links  ## build Raspberry Pi targets
+	$(BAZEL) build --config=pi64 //proxqp_mpc_balancer
 	$(BAZEL) build --config=pi64 //sshkeyboard_balancer
+	$(BAZEL) build --config=pi64 @upkie//spines:mock
 	$(BAZEL) build --config=pi64 @upkie//spines:pi3hat
+
+run_mock_spine:  ### run the mock spine on the Raspberry Pi
+	$(RASPUNZEL) run -s @upkie//spines:mock
 
 run_pi3hat_spine:  ### run the pi3hat spine on the Raspberry Pi
 	$(RASPUNZEL) run -s @upkie//spines:pi3hat
 
-run_wheel_balancer:  ### run the test balancer on the Raspberry Pi
+run_proxqp_mpc_balancer:  ### sandbox agent
+	$(RASPUNZEL) run -v -s //proxqp_mpc_balancer -- --config pi3hat --configure-cpu
+
+run_sshkeyboard_balancer:  ### sandbox agent
 	$(RASPUNZEL) run -v -s //sshkeyboard_balancer -- --config pi3hat --configure-cpu
 
 # Upload from host to Raspberry Pi
