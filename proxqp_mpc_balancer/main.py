@@ -229,7 +229,7 @@ async def balance(
                 live_plot.update(plan, t, initial_state, t)
             commanded_accel = plan.first_input
             commanded_velocity = clamp_and_warn(
-                commanded_velocity + commanded_accel * env.dt,
+                commanded_velocity + commanded_accel * env.dt / 2.0,
                 lower=-1.0,
                 upper=+1.0,
                 label="commanded_velocity",
