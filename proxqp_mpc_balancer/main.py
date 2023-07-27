@@ -260,9 +260,12 @@ def report(mpc_problem, mpc_qp, planning_times: Optional[np.ndarray]):
     print("")
     print(f"{mpc_problem.goal_state=}")
     print(f"{mpc_problem.nb_timesteps=}")
-    print(f"{mpc_problem.transition_input_matrix=}")
-    print(f"{mpc_qp.Phi.shape=}")
+    print(f"{mpc_qp.P.shape=}")
     print(f"{mpc_qp.q.shape=}")
+    print(f"{mpc_qp.G.shape=}")
+    print(f"{mpc_qp.h.shape=}")
+    print(f"{mpc_qp.Phi.shape=}")
+    print(f"{mpc_qp.Psi.shape=}")
     print("")
     if planning_times is not None:
         print(
