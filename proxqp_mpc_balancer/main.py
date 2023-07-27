@@ -111,12 +111,32 @@ def get_target_states(
 
 
 @gin.configurable
+class UpkieCartPole(CartPole):
+    def __init__(
+        self,
+        length: float,
+        max_ground_accel: float,
+        nb_timesteps: int,
+        sampling_period: float,
+    ):
+        super().__init__(
+            length=length,
+            max_ground_accel=max_ground_accel,
+            nb_timesteps=nb_timesteps,
+            sampling_period=sampling_period,
+        )
+
+
+@gin.configurable
 async def balance(
     env: gym.Env,
     logger: mpacklog.AsyncLogger,
     nb_env_steps: int,
     rebuild_qp_every_time: bool,
     show_live_plot: bool,
+    stage_input_cost_weight: float,
+    stage_state_cost_weight: float,
+    terminal_cost_weight: float,
     warm_start: bool,
 ):
     """!
@@ -125,16 +145,11 @@ async def balance(
     @param env Gym environment to Upkie.
     @param logger Additional logger.
     """
-    cart_pole = CartPole(
-        length=0.4,
-        max_ground_accel=10.0,
-        nb_timesteps=102,
-        sampling_period=0.005,
-    )
+    cart_pole = UpkieCartPole()
     mpc_problem = cart_pole.build_mpc_problem(
-        terminal_cost_weight=10.0,
-        stage_state_cost_weight=1.0,
-        stage_input_cost_weight=1e-3,
+        terminal_cost_weight=terminal_cost_weight,
+        stage_state_cost_weight=stage_state_cost_weight,
+        stage_input_cost_weight=stage_input_cost_weight,
     )
     mpc_problem.initial_state = np.zeros(4)
     mpc_qp = MPCQP(mpc_problem)
