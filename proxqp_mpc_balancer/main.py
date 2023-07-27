@@ -144,6 +144,7 @@ async def balance(
     action = np.zeros(env.action_space.shape)
     commanded_velocity = 0.0
     planning_times = np.empty((nb_env_steps,)) if nb_env_steps > 0 else None
+    base_pitches = np.empty((nb_env_steps,)) if nb_env_steps > 0 else None
     step = 0
     while True:
         action[0] = commanded_velocity
@@ -175,8 +176,8 @@ async def balance(
         nx = CartPole.STATE_DIM
         target_states = np.zeros((cart_pole.nb_timesteps + 1) * nx)
         mpc_problem.update_initial_state(initial_state)
-        mpc_problem.update_goal_state(target_states[-nx :])
-        mpc_problem.update_target_states(target_states[: -nx])
+        mpc_problem.update_goal_state(target_states[-nx:])
+        mpc_problem.update_target_states(target_states[:-nx])
 
         t0 = perf_counter()
         if rebuild_qp_every_time:
@@ -189,6 +190,7 @@ async def balance(
                 qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
             plan = Plan(mpc_problem, qpsol)
         if nb_env_steps > 0:
+            base_pitches[step] = base_pitch
             planning_times[step] = perf_counter() - t0
 
         if not ground_contact:
@@ -228,6 +230,8 @@ async def balance(
 
     await logger.stop()
     report(mpc_problem, mpc_qp, planning_times)
+    np.save("base_pitches.npy", base_pitches)
+    np.save("planning_times.npy", planning_times)
 
 
 def report(mpc_problem, mpc_qp, planning_times: Optional[np.ndarray]):
@@ -236,7 +240,6 @@ def report(mpc_problem, mpc_qp, planning_times: Optional[np.ndarray]):
     nb_env_steps = planning_times.size
     print("")
     print(f"{gin.operative_config_str()}")
-    print("")
     print(f"{mpc_problem.goal_state=}")
     print(f"{mpc_problem.nb_timesteps=}")
     print(f"{mpc_qp.P.shape=}")
