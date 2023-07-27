@@ -5,6 +5,7 @@
 
 """Wheel balancing using model predictive control of an LTV system."""
 
+import argparse
 import asyncio
 import os
 import time
@@ -17,16 +18,32 @@ import numpy as np
 import proxsuite
 import qpsolvers
 import upkie.envs
+from ltv_mpc import MPCQP, Plan, solve_mpc
+from ltv_mpc.systems import CartPole
 from qpsolvers import solve_problem
 from upkie.utils.clamp import clamp_and_warn
 from upkie.utils.filters import low_pass_filter
 from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.spdlog import logging
 
-from ltv_mpc import MPCQP, Plan, solve_mpc
-from ltv_mpc.systems import CartPole
-
 upkie.envs.register()
+
+
+def parse_command_line_arguments() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+
+    Returns:
+        Command-line arguments.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--live-plot",
+        help="Display a live plot of MPC trajectories",
+        action="store_true",
+        default=False,
+    )
+    return parser.parse_args()
 
 
 @gin.configurable
@@ -222,12 +239,12 @@ def report(planning_times: np.ndarray):
     print("")
 
 
-async def main():
+async def main(args):
     """Main function of our asyncio program."""
     logger = mpacklog.AsyncLogger("mpc_balancing.mpack")
     with gym.make("UpkieWheelsEnv-v4", frequency=200.0) as env:
         await asyncio.gather(
-            balance(env, logger),
+            balance(env, logger, show_live_plot=args.live_plot),
             logger.write(),  # write logs to file when there is time
         )
 
@@ -237,4 +254,5 @@ if __name__ == "__main__":
         configure_agent_process()
     agent_dir = os.path.dirname(__file__)
     gin.parse_config_file(f"{agent_dir}/config.gin")
-    asyncio.run(main())
+    args = parse_command_line_arguments()
+    asyncio.run(main(args))
