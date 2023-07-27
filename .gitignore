@@ -1,3 +1,4 @@
+*.mpack
 __pycache__
 bazel-*
 tools/bazel
