@@ -89,27 +89,6 @@ class ProxQPWorkspace:
         return qpsol
 
 
-def get_target_states(
-    cart_pole: CartPole, state: np.ndarray, target_vel: float
-):
-    """Define the reference state trajectory over the receding horizon.
-
-    Args:
-        state: Cart-pole state at the beginning of the horizon.
-        target_vel: Target ground velocity in m/s.
-
-    Returns:
-        Goal state at the end of the horizon.
-    """
-    nx = CartPole.STATE_DIM
-    T = cart_pole.sampling_period
-    target_states = np.zeros((cart_pole.nb_timesteps + 1) * nx)
-    for k in range(cart_pole.nb_timesteps + 1):
-        target_states[k * nx] = state[0] + (k * T) * target_vel
-        target_states[k * nx + 2] = target_vel
-    return target_states
-
-
 @gin.configurable
 class UpkieCartPole(CartPole):
     def __init__(
@@ -192,12 +171,12 @@ async def balance(
                 base_angular_velocity,
             ]
         )
-        target_vel = 0.0
-        target_states = get_target_states(cart_pole, initial_state, target_vel)
 
+        nx = CartPole.STATE_DIM
+        target_states = np.zeros((cart_pole.nb_timesteps + 1) * nx)
         mpc_problem.update_initial_state(initial_state)
-        mpc_problem.update_goal_state(target_states[-CartPole.STATE_DIM :])
-        mpc_problem.update_target_states(target_states[: -CartPole.STATE_DIM])
+        mpc_problem.update_goal_state(target_states[-nx :])
+        mpc_problem.update_target_states(target_states[: -nx])
 
         t0 = perf_counter()
         if rebuild_qp_every_time:
