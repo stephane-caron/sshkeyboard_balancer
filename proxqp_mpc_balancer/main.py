@@ -248,15 +248,21 @@ async def balance(
                 break
 
     await logger.stop()
-    report(planning_times)
+    report(mpc_problem, mpc_qp, planning_times)
 
 
-def report(planning_times: Optional[np.ndarray]):
+def report(mpc_problem, mpc_qp, planning_times: Optional[np.ndarray]):
     average_ms = 1e3 * np.average(planning_times)
     std_ms = 1e3 * np.std(planning_times)
     nb_env_steps = planning_times.size
     print("")
     print(f"{gin.operative_config_str()}")
+    print("")
+    print(f"{mpc_problem.goal_state=}")
+    print(f"{mpc_problem.nb_timesteps=}")
+    print(f"{mpc_problem.transition_input_matrix=}")
+    print(f"{mpc_qp.Phi.shape=}")
+    print(f"{mpc_qp.q.shape=}")
     print("")
     if planning_times is not None:
         print(
