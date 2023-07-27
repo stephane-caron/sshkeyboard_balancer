@@ -3,13 +3,14 @@
 #
 # Copyright 2023 Inria
 
-"""Wheel balancing using model predictive control of an LTV system."""
+"""Wheel balancing using model predictive control with the ProxQP solver."""
 
 import argparse
 import asyncio
 import os
 import time
 from time import perf_counter
+from typing import Optional
 
 import gin
 import gymnasium as gym
@@ -113,7 +114,7 @@ def get_target_states(
 async def balance(
     env: gym.Env,
     logger: mpacklog.AsyncLogger,
-    nb_steps: int,
+    nb_env_steps: int,
     rebuild_qp_every_time: bool,
     show_live_plot: bool,
     warm_start: bool,
@@ -148,8 +149,9 @@ async def balance(
     env.reset()  # connects to the spine
     action = np.zeros(env.action_space.shape)
     commanded_velocity = 0.0
-    planning_times = np.empty((nb_steps,))
-    for step in range(nb_steps):
+    planning_times = np.empty((nb_env_steps,)) if nb_env_steps > 0 else None
+    step = 0
+    while True:
         action[0] = commanded_velocity
         observation, _, terminated, truncated, info = await env.async_step(
             action
@@ -192,10 +194,10 @@ async def balance(
             else:
                 qpsol = solve_problem(mpc_qp.problem, solver="proxqp")
             plan = Plan(mpc_problem, qpsol)
-        planning_times[step] = perf_counter() - t0
+        if nb_env_steps > 0:
+            planning_times[step] = perf_counter() - t0
 
         if not ground_contact:
-            logging.info("Waiting for ground contact")
             commanded_velocity = low_pass_filter(
                 prev_output=commanded_velocity,
                 cutoff_period=0.1,
@@ -224,19 +226,29 @@ async def balance(
                 "time": time.time(),
             }
         )
+
+        if nb_env_steps > 0:
+            step += 1
+            if step >= nb_env_steps:
+                break
+
     await logger.stop()
     report(planning_times)
 
 
-def report(planning_times: np.ndarray):
+def report(planning_times: Optional[np.ndarray]):
     average_ms = 1e3 * np.average(planning_times)
     std_ms = 1e3 * np.std(planning_times)
-    nb_steps = planning_times.size
+    nb_env_steps = planning_times.size
     print("")
     print(f"{gin.operative_config_str()}")
     print("")
-    print(f"Over {nb_steps} calls: {average_ms:.2} ± {std_ms:.2} ms")
-    print("")
+    if planning_times is not None:
+        print(
+            "Planning time: "
+            f"{average_ms:.2} ± {std_ms:.2} ms over {nb_env_steps} calls"
+        )
+        print("")
 
 
 async def main(args):
