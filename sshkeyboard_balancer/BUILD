@@ -3,7 +3,7 @@
 # Copyright 2022 Stéphane Caron
 
 load("//tools/lint:lint.bzl", "add_lint_tests")
-load("@pip_upkie//:requirements.bzl", "requirement")
+load("@pip_upkie_sandbox//:requirements.bzl", "requirement")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -41,6 +41,7 @@ py_binary(
         "@vulp//spine:python",
         requirement("loop_rate_limiters"),
         requirement("pyyaml"),
+        requirement("sshkeyboard"),
     ],
 )
 
