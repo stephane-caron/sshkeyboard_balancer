@@ -34,11 +34,11 @@ py_binary(
     }),
     deps = [
         ":servo_controller",
-        "@mpacklog//:python",
         "@upkie//utils:raspi",
         "@upkie//utils:spdlog",
         "@vulp//spine:python",
         requirement("loop_rate_limiters"),
+        requirement("mpacklog"),
         requirement("pyyaml"),
         requirement("sshkeyboard"),
     ],
