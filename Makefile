@@ -24,7 +24,7 @@
 REMOTE = ${ROBOT}
 
 # Project name, needs to match the one in WORKSPACE
-PROJECT_NAME = upkie_sandbox
+PROJECT_NAME = sshkeyboard_balancer
 
 BAZEL = $(CURDIR)/tools/bazelisk
 CURDATE = $(shell date --iso=seconds)

@@ -3,7 +3,7 @@
 # Copyright 2022 Stéphane Caron
 
 load("//tools/lint:lint.bzl", "add_lint_tests")
-load("@pip_upkie_sandbox//:requirements.bzl", "requirement")
+load("@pip_sshkeyboard_balancer//:requirements.bzl", "requirement")
 
 package(default_visibility = ["//visibility:public"])
 

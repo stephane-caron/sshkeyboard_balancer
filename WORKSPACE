@@ -2,7 +2,7 @@
 #
 # Copyright 2022 Stéphane Caron
 
-workspace(name = "upkie_sandbox")
+workspace(name = "sshkeyboard_balancer")
 
 # Repositories
 # ============
@@ -36,9 +36,9 @@ add_rpi_bazel_repositories()
 # ===================
 
 # Depends on @rules_python which is a @palimpsest repository
-load("//tools/workspace/pip_upkie_sandbox:parse_deps.bzl", "parse_deps")
+load("//tools/workspace/pip_sshkeyboard_balancer:parse_deps.bzl", "parse_deps")
 parse_deps()
-load("@pip_upkie_sandbox//:requirements.bzl", "install_deps")
+load("@pip_sshkeyboard_balancer//:requirements.bzl", "install_deps")
 install_deps()
 
 # mpacklog also has Python dependencies
