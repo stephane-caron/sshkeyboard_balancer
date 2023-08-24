@@ -19,9 +19,9 @@ from typing import Any, Dict
 
 import gin
 import numpy as np
-from utils.clamp import clamp
+from upkie.utils.clamp import clamp
 
-from sshkeyboard_balancer.wheel_balancer import WheelBalancer
+from wheel_balancer import WheelBalancer
 
 
 @gin.configurable

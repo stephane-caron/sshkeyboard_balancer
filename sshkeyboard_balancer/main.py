@@ -30,12 +30,11 @@ import gin
 import mpacklog
 import yaml
 from loop_rate_limiters import AsyncRateLimiter
+from servo_controller import ServoController
 from sshkeyboard import listen_keyboard_manual
 from upkie.utils.raspi import configure_agent_process, on_raspi
-from utils.spdlog import logging
+from upkie.utils.spdlog import logging
 from vulp.spine import SpineInterface
-
-from sshkeyboard_balancer.servo_controller import ServoController
 
 keyboard_dict = {"key": ""}
 
@@ -68,7 +67,7 @@ def parse_command_line_arguments() -> argparse.Namespace:
 async def run(
     spine: SpineInterface,
     config: Dict[str, Any],
-    logger: mpacklog.Logger,
+    logger: mpacklog.AsyncLogger,
     frequency: float = 200.0,
 ) -> None:
     """
@@ -113,7 +112,7 @@ async def on_press(key: str):
 
 
 async def main(spine, config: Dict[str, Any]):
-    logger = mpacklog.Logger("/dev/shm/brain.mpack")
+    logger = mpacklog.AsyncLogger("/dev/shm/brain.mpack")
     await logger.put(
         {
             "config": config,

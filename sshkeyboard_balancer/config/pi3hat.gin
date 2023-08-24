@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sshkeyboard_balancer.wheel_balancer
+import wheel_balancer
 
 BalancingPlaneInIMUFrame.sagittal_axis = 0
 BalancingPlaneInIMUFrame.vertical_axis = 2
