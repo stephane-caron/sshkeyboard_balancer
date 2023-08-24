@@ -29,7 +29,6 @@ py_binary(
     data = [
         "//sshkeyboard_balancer/config",
     ] + select({
-        "//:pi32_config": ["@upkie//spines:pi3hat"],
         "//:pi64_config": ["@upkie//spines:pi3hat"],
         "//conditions:default": [],
     }),
