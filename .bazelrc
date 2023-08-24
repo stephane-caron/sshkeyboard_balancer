@@ -17,12 +17,6 @@ test --copt="-Werror=return-type"
 test --cxxopt=-std=c++17
 test --test_output=errors
 
-## Linter
-
-# Usage: bazel test --config lint //...
-test:lint --build_tests_only
-test:lint --test_tag_filters=lint
-
 ## Target platform: 64-bit Raspberry Pi OS
 
 build:pi64 --compilation_mode=opt

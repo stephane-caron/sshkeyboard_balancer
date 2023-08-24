@@ -2,7 +2,6 @@
 #
 # Copyright 2022 Stéphane Caron
 
-load("//tools/lint:lint.bzl", "add_lint_tests")
 load("@pip_sshkeyboard_balancer//:requirements.bzl", "requirement")
 
 package(default_visibility = ["//visibility:public"])
@@ -43,5 +42,3 @@ py_binary(
         requirement("sshkeyboard"),
     ],
 )
-
-add_lint_tests()
