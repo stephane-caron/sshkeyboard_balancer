@@ -24,7 +24,6 @@ from typing import Any, Dict, Tuple
 
 import gin
 import numpy as np
-
 from upkie.observers.base_pitch import compute_base_pitch_from_imu
 from upkie.utils.clamp import clamp, clamp_abs
 from upkie.utils.exceptions import FallDetected
@@ -328,11 +327,7 @@ class WheelBalancer:
         self.update_target_ground_velocity(observation, dt)
         self.update_target_yaw_velocity(observation, dt)
 
-        pitch = compute_base_pitch_from_imu(
-            observation["imu"]["orientation"],
-            sagittal_axis=self.balancing_plane.sagittal_axis,
-            vertical_axis=self.balancing_plane.vertical_axis,
-        )
+        pitch = compute_base_pitch_from_imu(observation["imu"]["orientation"])
         self.pitch = pitch
         if abs(pitch) > self.fall_pitch:
             self.integral_error_velocity = 0.0  # [m] / [s]
