@@ -13,10 +13,7 @@ py_library(
         "wheel_balancer.py",
     ],
     deps = [
-        "@upkie//observers/base_pitch",
-        "@upkie//utils:clamp",
-        "@upkie//utils:exceptions",
-        "@upkie//utils:filters",
+        "@upkie//:python",
         requirement("gin-config"),
     ],
 )
@@ -33,9 +30,8 @@ py_binary(
     }),
     deps = [
         ":servo_controller",
-        "@upkie//utils:raspi",
-        "@upkie//utils:spdlog",
-        "@vulp//spine:python",
+        "@upkie//:python",
+        "@vulp//:python",
         requirement("loop_rate_limiters"),
         requirement("mpacklog"),
         requirement("pyyaml"),
