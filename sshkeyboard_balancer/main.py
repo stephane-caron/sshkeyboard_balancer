@@ -19,15 +19,11 @@
 import argparse
 import asyncio
 import datetime
-import os
-import shutil
-import time
 import traceback
 from os import path
 from typing import Any, Dict
 
 import gin
-import mpacklog
 import yaml
 from loop_rate_limiters import AsyncRateLimiter
 from servo_controller import ServoController
@@ -67,7 +63,6 @@ def parse_command_line_arguments() -> argparse.Namespace:
 async def run(
     spine: SpineInterface,
     config: Dict[str, Any],
-    logger: mpacklog.AsyncLogger,
     frequency: float = 200.0,
 ) -> None:
     """
@@ -89,20 +84,11 @@ async def run(
         observation["keyboard"] = keyboard_dict
         action = controller.cycle(observation, dt)
         keyboard_dict["key"] = ""
-        action_time = time.time()
         spine.set_action(action)
         debug["rate"] = {
             "measured_period": rate.measured_period,
             "slack": rate.slack,
         }
-        await logger.put(
-            {
-                "action": action,
-                "debug": debug,
-                "observation": observation,
-                "time": action_time,
-            }
-        )
         await rate.sleep()
 
 
@@ -112,16 +98,8 @@ async def on_press(key: str):
 
 
 async def main(spine, config: Dict[str, Any]):
-    logger = mpacklog.AsyncLogger("/dev/shm/brain.mpack")
-    await logger.put(
-        {
-            "config": config,
-            "time": time.time(),
-        }
-    )
     await asyncio.gather(
-        run(spine, config, logger),
-        logger.write(),
+        run(spine, config),
         listen_keyboard_manual(
             on_press=on_press,
             sleep=0.01,
@@ -168,9 +146,3 @@ if __name__ == "__main__":
 
     now = datetime.datetime.now()
     stamp = now.strftime("%Y-%m-%d_%H%M%S")
-    log_dir = os.environ.get("UPKIE_LOG_PATH", "~")
-    save_path = os.path.expanduser(
-        f"{log_dir}/sshkeyboard_balancer_{stamp}.mpack"
-    )
-    shutil.copy("/dev/shm/brain.mpack", save_path)
-    logging.info(f"Log saved to {save_path}")
