@@ -20,4 +20,4 @@ Or, assuming you have pip-installed `upkie==1.4.0`, run the main script directly
 python sshkeyboard_balancer/main.py -c bullet
 ```
 
-The Makefile in this repository can upload and run spines and agents on the Raspberry Pi. Check out the [motion control software instructions](https://github.com/tasts-robots/upkie/wiki/5%29-Motion-control-software) and run ``make help`` for details.
+The Makefile in this repository can upload and run spines and agents on the Raspberry Pi. Check out the [motion control software instructions](https://github.com/upkie/upkie/wiki/5%29-Motion-control-software) and run ``make help`` for details.
